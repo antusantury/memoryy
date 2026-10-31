@@ -16,6 +16,7 @@ const userBin = join(process.env.HOME || "", ".local/bin");
 const homebrewBin = process.arch === "arm64" ? "/opt/homebrew/bin" : "/usr/local/bin";
 
 function getInstallerLanguage() {
+  if (process.platform === "darwin") return "en";
   if (process.platform !== "win32") return "";
   const languageFile = join(process.resourcesPath, "installer-language.txt");
   if (!existsSync(languageFile)) return "";
