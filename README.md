@@ -58,24 +58,6 @@ Install Codex CLI and use the browser login button in the settings. Memoryy only
 
 You can connect a local Ollama model or an OpenAI-compatible endpoint. Any API key is entered locally in the application settings and is never part of the source code or repository.
 
-## Installers
-
-The current installers are built locally in `release/`:
-
-- **macOS:** `Memoryy-0.1.0.dmg`
-- **Windows:** `Memoryy Setup 0.1.0.exe`
-
-The Windows installer supports English and Russian selection. The selected language is used on the first application launch. On macOS, the language can be selected in the application settings.
-
-These installers are unsigned in this release. macOS Gatekeeper or Windows SmartScreen may show a warning until Apple Developer ID and Windows code-signing certificates are configured.
-
-Build the installers locally with:
-
-```bash
-npm run dist
-```
-
-For a verified Windows build, run the build on Windows. For public distribution, configure code signing before publishing.
 
 ## Data and backups
 
