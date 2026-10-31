@@ -96,3 +96,6 @@ build/             NSIS installer configuration
 ## License
 
 Memoryy is distributed under the MIT License. See [`LICENSE`](LICENSE).
+
+
+
