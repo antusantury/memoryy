@@ -1,4 +1,4 @@
-# Memoryy
+# Memoryy ![Status](https://img.shields.io/badge/status-MVP-orange)
 
 **Memoryy is a local-first learning archive with an AI librarian.** It stores conversations, notes, files, topics, and decisions in one searchable workspace so your learning context does not disappear when an AI chat reaches its context limit.
 
