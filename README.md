@@ -1,9 +1,19 @@
 # Memoryy ![Status](https://img.shields.io/badge/status-MVP-orange) ![License](https://img.shields.io/badge/license-MIT-blue) ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)
 
 
+
 **Memoryy is a local-first learning archive with an AI librarian.** It stores conversations, notes, files, topics, and decisions in one searchable workspace so your learning context does not disappear when an AI chat reaches its context limit.
 
 > **Status:** early desktop MVP. User data is stored locally on the user's computer.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/031995d3-4183-4f6f-b86f-0fdc45667b41" alt="Overview" width="45%" />
+  &nbsp;&nbsp;&nbsp; <!-- Это отступ между картинками -->
+  <img src="https://github.com/user-attachments/assets/a334a2b7-40d2-4fcf-9073-621fde98443d" alt="AI Chat" width="45%" />
+</p>
+<p align="center">
+  <i>Left: Learning Overview &nbsp;|&nbsp; Right: AI Chat</i>
+</p>
 
 
 ## Table of Contents
