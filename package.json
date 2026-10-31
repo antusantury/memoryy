@@ -1,0 +1,58 @@
+{
+  "name": "memoryy",
+  "version": "0.1.0",
+  "private": true,
+  "author": "Antu Santury",
+  "repository": "https://github.com/antusantury/memoryy",
+  "license": "MIT",
+  "main": "electron-main.js",
+  "description": "Local-first learning memory workspace",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "desktop": "electron electron-main.js",
+    "desktop:dev": "electron electron-main.js",
+    "dist": "electron-builder --mac --win"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "electron": "^38.8.6",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.memoryy.app",
+    "productName": "Memoryy",
+    "files": [
+      "electron-main.js",
+      "splash.html",
+      "assets/**/*",
+      "server.js",
+      "public/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/memoryy-icon.icns"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/memoryy-icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "installerLanguages": [
+        "en_US",
+        "ru_RU"
+      ],
+      "include": "build/installer.nsh"
+    }
+  }
+}
