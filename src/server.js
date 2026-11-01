@@ -331,6 +331,16 @@ async function buildLibraryCompilation(topic, ai, interfaceLanguage = "en") {
   db.prepare("UPDATE projects SET updated_at=? WHERE id=?").run(timestamp, project.id);
   return { id, title, topic, markdown: document, sources: sources.map((item) => ({ id: item.id, title: item.title })) };
 }
+function parseCompilationRequest(message) {
+  const normalized = String(message || "").replace(/\s+/g, " ").trim();
+  const word = "(?<![\\p{L}])(?:конспект|контекст)(?![\\p{L}])";
+  const intent = "(?<![\\p{L}])(?:собери|сделай|создай|подготовь|напиши|составь|можешь|можно|нужен|нужна|надо|хочу|попроси)(?![\\p{L}])";
+  if (!new RegExp(word, "iu").test(normalized)) return null;
+  if (!new RegExp(intent, "iu").test(normalized)) return null;
+  const topicMatch = normalized.match(/(?<![\p{L}])(?:по теме|по|о|об|про)\s+(.+?)(?:[.!?]+)?$/iu);
+  const topic = topicMatch?.[1]?.trim() || "библиотеке";
+  return { topic: topic.replace(/[.!?]+$/, "").trim() || "библиотеке" };
+}
 async function processSession(sessionId, config = { provider: "copilot" }) {
   const session = db.prepare(`
     SELECT s.id, s.title, s.project_id, GROUP_CONCAT(m.role || ': ' || m.content, char(10)) AS content
@@ -585,11 +595,17 @@ function route(req, res) {
         resolveContext(`# Проект: ${project.title}\n${project.summary}\n\n${materials.join("\n\n")}`);
       })) : "";
       const conversationContext = `${context}${history ? `\n\nИстория этого диалога:\n${history}` : ""}`;
-      const compilationMatch = input.message.trim().match(/(?:собери|сделай|создай|подготовь)\s+(?:мне\s+)?(?:конспект|контекст)(?:\s+по\s+теме)?\s+(.+)/i);
-      if (compilationMatch) {
-        const artifact = await buildLibraryCompilation(compilationMatch[1].replace(/[.!?]+$/, "").trim(), input.ai, input.language);
+      const compilationRequest = parseCompilationRequest(input.message);
+      if (compilationRequest) {
+        const artifact = await buildLibraryCompilation(compilationRequest.topic, input.ai, input.language);
+        const answer = input.language === "ru"
+          ? `Готово. Конспект сохранён в библиотеке: [Конспект](memoryy://note/${artifact.id})`
+          : `Done. The study note was saved to your library: [Study note](memoryy://note/${artifact.id})`;
+        db.prepare("INSERT INTO chat_messages (id,chat_session_id,role,content,created_at) VALUES (?,?,?,?,?)")
+          .run(randomUUID(), chatSessionId, "assistant", answer, now());
+        db.prepare("UPDATE chat_sessions SET updated_at=? WHERE id=?").run(now(), chatSessionId);
         return json(res, 200, {
-          answer: `${input.language === "ru" ? "Готово. Конспект сохранён в библиотеке" : "Done. The study note was saved to your library"}: [${artifact.title}](memoryy://note/${artifact.id})`,
+          answer,
           artifact: { id: artifact.id, title: artifact.title }
         });
       }
