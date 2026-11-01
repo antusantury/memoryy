@@ -1,8 +1,12 @@
 import { app, BrowserWindow, shell } from "electron";
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import http from "node:http";
+
+const sourceDir = dirname(fileURLToPath(import.meta.url));
+const appRoot = dirname(sourceDir);
 
 let serverProcess;
 let splash;
@@ -13,6 +17,14 @@ const serverPort = 4173;
 const copilotPath = process.env.COPILOT_BIN || join(process.env.HOME || "", ".local/bin/copilot");
 const userBin = join(process.env.HOME || "", ".local/bin");
 const homebrewBin = process.arch === "arm64" ? "/opt/homebrew/bin" : "/usr/local/bin";
+
+function resourcePath(...parts) {
+  return join(appRoot, ...parts);
+}
+
+function iconPath() {
+  return resourcePath("assets", "memoryy-icon.png");
+}
 
 function getInstallerLanguage() {
   if (process.platform === "darwin") return "en";
@@ -28,12 +40,12 @@ function getInstallerLanguage() {
 }
 
 function startServer() {
-  serverProcess = spawn(process.execPath, [join(app.getAppPath(), "src", "server.js")], {
+  serverProcess = spawn(process.execPath, [resourcePath("src", "server.js")], {
     cwd: app.getPath("userData"),
     env: {
       ...process.env,
       ELECTRON_RUN_AS_NODE: "1",
-      MEMORYY_ROOT: app.getAppPath(),
+      MEMORYY_ROOT: appRoot,
        MEMORYY_DATA_DIR: join(app.getPath("userData"), "data"),
        MEMORYY_DEFAULT_LANGUAGE: getInstallerLanguage() || "en",
       PATH: [userBin, homebrewBin, process.env.PATH || ""].filter(Boolean).join(":"),
@@ -52,7 +64,7 @@ function createWindow() {
     minHeight: 680,
     backgroundColor: "#111114",
     title: "Memoryy",
-    icon: join(app.getAppPath(), "assets/memoryy-icon.png"),
+    icon: iconPath(),
     show: false,
     webPreferences: {
       contextIsolation: true,
@@ -95,7 +107,10 @@ function waitForServer() {
 }
 
 app.whenReady().then(() => {
-  if (process.platform === "darwin") app.dock.setIcon(join(app.getAppPath(), "assets/memoryy-icon.png"));
+  if (process.platform === "darwin") {
+    const icon = iconPath();
+    if (existsSync(icon)) app.dock.setIcon(icon);
+  }
   splash = new BrowserWindow({
     width: 560,
     height: 360,
@@ -111,7 +126,7 @@ app.whenReady().then(() => {
     splash.show();
     splashReadyResolve();
   });
-  splash.loadFile(join(app.getAppPath(), "splash.html"));
+  splash.loadFile(resourcePath("splash.html"));
   startServer();
   waitForServer().then(() => createWindow()).catch((error) => {
     console.error(`Memoryy failed to start: ${error.message}`);
