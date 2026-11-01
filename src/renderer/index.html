@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Memoryy — learning memory</title>
-    <link rel="stylesheet" href="/styles.css?v=5">
+    <title data-i18n="appTitle">Memoryy — learning memory</title>
+    <link rel="stylesheet" href="/styles.css?v=7">
   </head>
   <body>
     <aside class="sidebar">
@@ -14,13 +14,13 @@
         <button class="nav-item active" data-view="overview">⌂ <span data-i18n="overview">Overview</span></button>
         <button class="nav-item" data-view="copilot">✦ <span data-i18n="aiChat">AI chat</span></button>
         <button class="nav-item" data-view="sessions">▤ <span data-i18n="library">Library</span></button>
+        <button class="nav-item" data-view="timeline">◎ <span data-i18n="knowledgeMap">Knowledge map</span></button>
         <button class="nav-item" data-view="import">＋ <span data-i18n="import">Context import</span></button>
-        <button class="nav-item" data-view="timeline">⌁ <span data-i18n="knowledgeMap">Knowledge map</span></button>
       </nav>
       <div class="sidebar-footer"><button id="theme-settings" class="nav-item">⚙ <span data-i18n="settings">Settings</span></button><div class="local-status"><span class="status-dot"></span> <span data-i18n="localOnly">Stored locally on this device</span></div></div>
     </aside>
     <main>
-      <header class="topbar"><div><p class="eyebrow" data-i18n="workspace">WORKSPACE</p><h1 id="page-title">Learning overview</h1></div><div class="topbar-tools"><div class="ai-indicator-wrap"><button id="ai-indicator" class="ai-indicator" aria-label="AI status"><span></span></button><div class="ai-tooltip"><strong id="ai-tooltip-title">Checking AI</strong><small id="ai-tooltip-text">Checking connection…</small><button id="ai-tooltip-settings">Go to Settings →</button></div><span data-i18n="aiLibrarian">AI librarian</span></div><div id="topbar-action"></div></div></header>
+      <header class="topbar"><div><p class="eyebrow" data-i18n="workspace">WORKSPACE</p><h1 id="page-title">Learning overview</h1></div><div class="topbar-tools"><div class="ai-indicator-wrap"><button id="ai-indicator" class="ai-indicator" aria-label="AI status"><span></span></button><div class="ai-tooltip"><strong id="ai-tooltip-title" data-i18n="checkingAi">Checking AI</strong><small id="ai-tooltip-text" data-i18n="checkingConnection">Checking connection…</small><button id="ai-tooltip-settings" data-i18n="goToSettings">Go to Settings →</button></div><span data-i18n="aiLibrarian">AI librarian</span></div><div id="topbar-action"></div></div></header>
       <section id="app"></section>
     </main>
     <div id="toast" class="toast"></div>

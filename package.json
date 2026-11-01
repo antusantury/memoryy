@@ -1,15 +1,15 @@
 {
   "name": "memoryy",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
-  "main": "electron-main.js",
+  "main": "src/electron-main.js",
   "description": "Local-first learning memory workspace",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "desktop": "electron electron-main.js",
-    "desktop:dev": "electron electron-main.js",
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "desktop": "electron src/electron-main.js",
+    "desktop:dev": "electron src/electron-main.js",
     "dist": "electron-builder --mac --win"
   },
   "engines": {
@@ -23,11 +23,9 @@
     "appId": "com.memoryy.app",
     "productName": "Memoryy",
     "files": [
-      "electron-main.js",
+      "src/**/*",
       "splash.html",
       "assets/**/*",
-      "server.js",
-      "public/**/*",
       "package.json"
     ],
     "directories": {
@@ -53,6 +51,7 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.8.11"
+    "electron-updater": "^6.8.11",
+    "pdf-parse": "^2.4.5"
   }
 }

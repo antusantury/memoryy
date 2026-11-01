@@ -89,9 +89,9 @@ Original uploaded files are stored locally. The maximum size of one file is 20 M
 ## Project structure
 
 ```text
-electron-main.js   Electron shell and splash screen
-server.js          Local HTTP server, SQLite, and AI providers
-public/            Browser interface
+src/electron-main.js  Electron shell and splash screen
+src/server.js         Local HTTP server, SQLite, and AI providers
+src/renderer/         Browser interface, styles, and localization
 assets/            Application icons
 build/             NSIS installer configuration
 ```
@@ -99,6 +99,5 @@ build/             NSIS installer configuration
 ## License
 
 Memoryy is distributed under the MIT License. See [`LICENSE`](LICENSE).
-
 
 
