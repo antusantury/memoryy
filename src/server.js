@@ -7,7 +7,6 @@ import { randomUUID } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { DatabaseSync } from "node:sqlite";
-import { PDFParse } from "pdf-parse";
 
 const execFileAsync = promisify(execFile);
 const root = resolve(process.env.MEMORYY_ROOT || ".");
@@ -45,6 +44,7 @@ db.exec(`
     id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     title TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'manual', summary TEXT NOT NULL DEFAULT '',
     librarian_status TEXT NOT NULL DEFAULT 'pending', topics TEXT NOT NULL DEFAULT '[]',
+    topic_colors TEXT NOT NULL DEFAULT '{}',
     decisions TEXT NOT NULL DEFAULT '[]', open_questions TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS messages (
@@ -71,9 +71,10 @@ const sessionColumns = db.prepare("PRAGMA table_info(sessions)").all().map((colu
 if (!sessionColumns.includes("librarian_status")) {
   db.exec("ALTER TABLE sessions ADD COLUMN librarian_status TEXT NOT NULL DEFAULT 'pending'");
 }
-for (const column of ["topics", "decisions", "open_questions"]) {
-  if (!sessionColumns.includes(column)) db.exec(`ALTER TABLE sessions ADD COLUMN ${column} TEXT NOT NULL DEFAULT '[]'`);
+for (const column of ["topics", "topic_colors", "decisions", "open_questions"]) {
+  if (!sessionColumns.includes(column)) db.exec(`ALTER TABLE sessions ADD COLUMN ${column} TEXT NOT NULL DEFAULT '${column === "topic_colors" ? "{}" : "[]"}'`);
 }
+db.exec("UPDATE sessions SET topic_colors='{}' WHERE topic_colors IS NULL OR topic_colors='[]'");
 
 const now = () => new Date().toISOString();
 const json = (res, status, value) => {
@@ -186,6 +187,7 @@ async function extractFileText(name, mime, buffer) {
     return extractWebArchiveText(buffer);
   }
   if (mime === "application/pdf" || extension === ".pdf") {
+    const { PDFParse } = await import("pdf-parse");
     const parser = new PDFParse({ data: buffer });
     try {
       const result = await parser.getText();
@@ -201,7 +203,7 @@ async function extractFileText(name, mime, buffer) {
 }
 function librarianPrompt(title, content) {
   return `Ты — аналитик архива. Проанализируй только приведённый ниже источник и верни только JSON без markdown.
-Формат: {"summary":"краткое точное резюме только по источнику","topics":["до 5 тем, явно встречающихся в источнике"],"decisions":["только решения, явно принятые в источнике"],"open_questions":["только вопросы, явно оставшиеся открытыми в источнике"]}
+Формат: {"summary":"краткое точное резюме только по источнику","topics":["до 5 тем, явно встречающихся в источнике"],"topic_colors":{"точное название темы":"#RRGGBB"},"decisions":["только решения, явно принятые в источнике"],"open_questions":["только вопросы, явно оставшиеся открытыми в источнике"]}
 Строгие правила:
 - Сначала прочитай весь источник от начала до конца. Не делай вывод по первым ключевым словам.
 - Ничего не выдумывай и не дополняй общими знаниями. Если данных недостаточно, верни пустые массивы и честно укажи это в summary.
@@ -215,6 +217,7 @@ function librarianPrompt(title, content) {
 - Не пересказывай и не анализируй изображения или вложения, если их содержимое не представлено текстом.
 - topics должны быть конкретными и подтверждаться несколькими фрагментами либо явным заголовком источника.
 - summary должен описывать фактическое содержание, а не предполагать намерения автора.
+- Для каждой темы из topics выбери один выразительный, различимый цвет в формате #RRGGBB. Цвет должен подходить для тёмного интерфейса и быть стабильным для этой темы.
 Тема файла: ${title}
 Размер извлечённого текста: ${content.length} символов.
 Статус извлечения: УСПЕШНО. Текст ниже уже извлечён из файла сервером; не нужно искать или повторно загружать исходный webarchive.
@@ -268,6 +271,11 @@ function normalizeTopics(value) {
     .filter((topic) => !blocked.has(topic.toLocaleLowerCase("ru-RU")))
     .filter((topic) => topic.split(/\s+/).length <= 5))]
     .slice(0, 5);
+}
+function normalizeTopicColors(value, topics = []) {
+  const colors = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const valid = /^#[0-9a-f]{6}$/i;
+  return Object.fromEntries(topics.filter((topic) => valid.test(String(colors[topic] || ""))).map((topic) => [topic, String(colors[topic]).toUpperCase()]));
 }
 for (const session of db.prepare("SELECT id, topics FROM sessions").all()) {
   const topics = JSON.stringify(normalizeTopics(JSON.parse(session.topics || "[]")));
@@ -370,8 +378,9 @@ async function processSession(sessionId, config = { provider: "copilot" }) {
   db.prepare("UPDATE sessions SET librarian_status='pending' WHERE id=?").run(sessionId);
   try {
     const result = await askProvider(session.title, content, config);
-    db.prepare("UPDATE sessions SET summary=?, topics=?, decisions=?, open_questions=?, librarian_status='processed' WHERE id=?")
-      .run(result.summary || "", JSON.stringify(normalizeTopics(result.topics)), JSON.stringify(result.decisions || []), JSON.stringify(result.open_questions || []), sessionId);
+    const topics = normalizeTopics(result.topics);
+    db.prepare("UPDATE sessions SET summary=?, topics=?, topic_colors=?, decisions=?, open_questions=?, librarian_status='processed' WHERE id=?")
+      .run(result.summary || "", JSON.stringify(topics), JSON.stringify(normalizeTopicColors(result.topic_colors, topics)), JSON.stringify(result.decisions || []), JSON.stringify(result.open_questions || []), sessionId);
   } catch (error) {
     db.prepare("UPDATE sessions SET librarian_status='waiting' WHERE id=?").run(sessionId);
     throw error;
@@ -452,7 +461,7 @@ function route(req, res) {
     const sessions = projectId
       ? db.prepare("SELECT * FROM sessions WHERE project_id=? ORDER BY created_at DESC").all(projectId)
       : db.prepare("SELECT * FROM sessions ORDER BY created_at DESC").all();
-    return json(res, 200, sessions.map((session) => ({ ...session, topics: normalizeTopics(JSON.parse(session.topics || "[]")) })));
+    return json(res, 200, sessions.map((session) => ({ ...session, topics: normalizeTopics(JSON.parse(session.topics || "[]")), topic_colors: normalizeTopicColors(JSON.parse(session.topic_colors || "{}"), normalizeTopics(JSON.parse(session.topics || "[]"))) })));
   }
   if (req.method === "GET" && url.pathname.startsWith("/api/sessions/")) {
     const sessionId = url.pathname.split("/").pop();
@@ -460,14 +469,15 @@ function route(req, res) {
     if (!session) return sendError(res, 404, "Сессия не найдена");
     session.messages = db.prepare("SELECT role, content, created_at FROM messages WHERE session_id=? ORDER BY created_at").all(sessionId);
     for (const field of ["topics", "decisions", "open_questions"]) session[field] = JSON.parse(session[field] || "[]");
+    session.topic_colors = normalizeTopicColors(JSON.parse(session.topic_colors || "{}"), session.topics);
     return json(res, 200, session);
   }
   if (req.method === "GET" && url.pathname === "/api/timeline") {
     const rows = db.prepare(`
-      SELECT id, title, 'project' AS type, created_at, summary AS description, '[]' AS topics FROM projects
-      UNION ALL SELECT id, title, 'session', created_at, summary, topics FROM sessions
+      SELECT id, title, 'project' AS type, created_at, summary AS description, 'project' AS source, '[]' AS topics, '{}' AS topic_colors FROM projects
+      UNION ALL SELECT id, title, 'session', created_at, summary, source, topics, topic_colors FROM sessions
       ORDER BY created_at DESC
-    `).all().map((row) => ({ ...row, topics: normalizeTopics(JSON.parse(row.topics || "[]")) }));
+    `).all().map((row) => ({ ...row, topics: normalizeTopics(JSON.parse(row.topics || "[]")), topic_colors: normalizeTopicColors(JSON.parse(row.topic_colors || "{}"), normalizeTopics(JSON.parse(row.topics || "[]"))) }));
     return json(res, 200, rows);
   }
   if (req.method === "GET" && url.pathname === "/api/context") {

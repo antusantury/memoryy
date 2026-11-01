@@ -63,6 +63,7 @@ function createWindow() {
     minWidth: 980,
     minHeight: 680,
     backgroundColor: "#111114",
+    opacity: 0,
     title: "Memoryy",
     icon: iconPath(),
     show: false,
@@ -73,13 +74,33 @@ function createWindow() {
     }
   });
 
+  function showWindowSmoothly() {
+    window.show();
+    const startedAt = Date.now();
+    const duration = 550;
+    const tick = () => {
+      if (window.isDestroyed()) return;
+      const progress = Math.min(1, (Date.now() - startedAt) / duration);
+      window.setOpacity(progress);
+      if (progress < 1) setTimeout(tick, 16);
+    };
+    tick();
+  }
+
   window.once("ready-to-show", () => {
     splashReady.then(() => {
-      const remaining = Math.max(0, 6000 - (Date.now() - splashStartedAt));
+      const remaining = Math.max(0, 6800 - (Date.now() - splashStartedAt));
       setTimeout(() => {
-        splash?.close();
-        splash = null;
-        window.show();
+        splash?.webContents.executeJavaScript("document.body.classList.add('splash-closing')", true);
+        setTimeout(() => {
+          splash?.close();
+          splash = null;
+          showWindowSmoothly();
+          window.webContents.executeJavaScript(
+            "requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add('app-ready')))",
+            true
+          );
+        }, 450);
       }, remaining);
     });
   });

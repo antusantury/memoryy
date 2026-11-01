@@ -22,6 +22,7 @@
   "build": {
     "appId": "com.memoryy.app",
     "productName": "Memoryy",
+    "compression": "maximum",
     "files": [
       "src/**/*",
       "splash.html",
@@ -51,7 +52,6 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.8.11",
     "pdf-parse": "^2.4.5"
   }
 }

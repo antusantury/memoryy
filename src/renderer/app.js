@@ -145,7 +145,7 @@ function renderCompile() { currentScreen = "compile"; setActive("copilot"); titl
   search.oninput = updateFilter; topicFilter.onchange = updateFilter; document.querySelectorAll("[data-map-session]").forEach((node) => node.onclick = () => { const event = positions.find((item) => item.id === node.dataset.mapSession); if (event) updateSelection(event); }); wireCanvas();
     */
 }
-async function renderMapNew() {
+async function renderMapLegacy() {
   currentScreen = "timeline";
   setActive("timeline");
   title.textContent = text("knowledgeMap");
@@ -238,6 +238,58 @@ function wireCanvas() {
     originY = (wrap.clientHeight - canvas.offsetHeight) / 2;
     schedulePaint();
   };
+}
+async function renderMapNew() {
+  currentScreen = "timeline";
+  setActive("timeline");
+  title.textContent = text("knowledgeMap");
+  document.querySelector("#topbar-action").innerHTML = "";
+  let events = [];
+  try { events = (await api("/api/timeline") || []).filter((event) => event.type === "session"); } catch (error) { events = []; }
+  const locale = getLanguage() === "ru" ? "ru-RU" : "en-US";
+  const palette = ["#9B8AFB", "#58C7B5", "#F2A65A", "#E4779A", "#72A7F7", "#C6D85F", "#D98CF0", "#F07E5D"];
+  const topics = [...new Set(events.flatMap((event) => event.topics || []))].sort((a, b) => a.localeCompare(b, locale));
+  const colors = Object.fromEntries(topics.map((topic, index) => {
+    const stored = events.find((event) => event.topic_colors?.[topic])?.topic_colors?.[topic];
+    return [topic, stored || palette[index % palette.length]];
+  }));
+  const topicRadius = Math.max(320, topics.length * 46);
+  const outerRadius = 190 + Math.max(0, ...topics.map((topic) => Math.ceil(events.filter((event) => (event.topics || []).includes(topic)).length / 3) * 135));
+  const width = Math.max(1250, Math.ceil((topicRadius + outerRadius) * 2 + 380));
+  const height = Math.max(1000, Math.ceil((topicRadius + outerRadius) * 2 + 380));
+  const center = { x: width / 2, y: height / 2 };
+  const topicPositions = topics.map((topic, index) => {
+    const angle = (index / Math.max(topics.length, 1)) * Math.PI * 2 - Math.PI / 2;
+    return { topic, angle, x: center.x + Math.cos(angle) * topicRadius, y: center.y + Math.sin(angle) * topicRadius };
+  });
+  const topicByName = new Map(topicPositions.map((item) => [item.topic, item]));
+  const topicCounts = new Map(topics.map((topic) => [topic, 0]));
+  const positions = events.map((event) => {
+    const eventTopics = (event.topics || []).filter((topic) => topicByName.has(topic));
+    const primary = eventTopics[0] || topics[0];
+    const anchor = topicByName.get(primary) || { ...center, angle: 0 };
+    const index = topicCounts.get(primary) || 0;
+    topicCounts.set(primary, index + 1);
+    const column = (index % 3) - 1;
+    const row = Math.floor(index / 3);
+    const tangentX = -Math.sin(anchor.angle) * column * 270;
+    const tangentY = Math.cos(anchor.angle) * column * 270;
+    const radial = 220 + row * 180;
+    return { ...event, eventTopics, x: anchor.x + Math.cos(anchor.angle) * radial + tangentX, y: anchor.y + Math.sin(anchor.angle) * radial + tangentY };
+  });
+  const nodeMarkup = (visible) => visible.map((event) => `<button class="map-node map-session-node ${event.source === "librarian-note" ? "map-note-node" : ""}" data-map-session="${escapeHtml(event.id)}" style="left:${event.x}px;top:${event.y}px;--node-accent:${colors[event.eventTopics[0]] || "var(--accent)"}"><span class="node-type">${event.source === "librarian-note" ? "✦ NOTE" : text("dialog")} · ${new Date(event.created_at).toLocaleDateString(locale)}</span><strong>${escapeHtml(event.title)}</strong><small>${escapeHtml(event.description || text("noSummary"))}</small><div class="node-topics">${event.eventTopics.slice(0, 3).map((topic) => `<i style="--topic-color:${colors[topic]}">${escapeHtml(topic)}</i>`).join("") || `<i class="muted-topic">${text("noTopics")}</i>`}</div></button>`).join("");
+  const topicMarkup = topicPositions.map((item) => `<button class="map-topic-node" data-map-topic="${escapeHtml(item.topic)}" style="left:${item.x}px;top:${item.y}px;--topic-color:${colors[item.topic]}"><span class="topic-orb"></span><strong>${escapeHtml(item.topic)}</strong><small>${topicCounts.get(item.topic) || 0} ${text("conversationsCount")}</small></button>`).join("");
+  const edgeMarkup = (visible) => visible.flatMap((event) => event.eventTopics.map((topic) => {
+    const target = topicByName.get(topic); if (!target) return "";
+    const bendX = (target.x + event.x) / 2 + (event.y - target.y) * .12;
+    const bendY = (target.y + event.y) / 2 - (event.x - target.x) * .12;
+    return `<path class="topic-link" stroke="${colors[topic]}" style="stroke:${colors[topic]};" d="M ${target.x} ${target.y} Q ${bendX} ${bendY} ${event.x} ${event.y}" />`;
+  })).join("");
+  app.innerHTML = `<div class="map-page map-graph-page"><div class="map-header"><div><p class="eyebrow">${text("knowledgeCanvas")}</p><h2>${text("learningMap")}</h2><p class="muted">${text("exploreConnections")}</p></div></div><div class="map-workspace"><aside class="map-sidebar"><div class="map-sidebar-head"><span class="map-sidebar-icon">✦</span><div><strong>${escapeHtml(projects[0]?.title || text("myLearning"))}</strong><small>${text("workspaceCenter")}</small></div></div><label class="map-search"><span>${text("searchMap")}</span><input id="map-search" placeholder="${text("findConversationOrTopic")}"></label><div class="map-stat-row"><div><strong>${events.length}</strong><small>${text("conversationsCount")}</small></div><div><strong>${topics.length}</strong><small>${text("topicsCount")}</small></div></div><div class="map-help"><span>${text("navigation")}</span><p>${text("howToUseText")}</p><small>⌘ + drag · scroll</small></div></aside><div class="canvas-wrap" id="canvas-wrap"><div class="knowledge-canvas" id="knowledge-canvas" style="width:${width}px;height:${height}px"><svg id="map-lines" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">${edgeMarkup(positions)}</svg><div class="map-graph-center"><span class="star-core">✦</span><strong>${escapeHtml(projects[0]?.title || text("myLearning"))}</strong></div><div id="map-topics">${topicMarkup}</div><div id="map-nodes">${nodeMarkup(positions) || `<div class="empty canvas-empty">${text("addDialogsAppear")}</div>`}</div></div><div class="map-hud" role="group" aria-label="${text("navigation")}"><output id="map-zoom">100%</output><input id="map-zoom-range" type="range" min="8" max="400" value="100" step="1" aria-label="${text("navigation")}"><button id="map-reset" class="map-reset-button" aria-label="${text("reset")}">↺</button></div><div class="canvas-hint">${text("dragCanvas")}</div></div></div></div>`;
+  const nodesRoot = document.querySelector("#map-nodes"), search = document.querySelector("#map-search");
+  const bindNodes = () => document.querySelectorAll("[data-map-session]").forEach((node) => node.onclick = () => showSession(node.dataset.mapSession));
+  const updateFilter = () => { const query = search.value.trim().toLocaleLowerCase(locale); const visible = positions.filter((event) => !query || `${event.title} ${(event.eventTopics || []).join(" ")}`.toLocaleLowerCase(locale).includes(query)); nodesRoot.innerHTML = nodeMarkup(visible) || `<div class="empty canvas-empty">${text("nothingFoundFilters")}</div>`; document.querySelector("#map-lines").innerHTML = edgeMarkup(visible); bindNodes(); };
+  search.oninput = updateFilter; document.querySelectorAll("[data-map-topic]").forEach((node) => node.onclick = () => { search.value = node.dataset.mapTopic; updateFilter(); }); bindNodes(); wireCanvas();
 }
 function renderThemeSettings() {
   currentScreen = "settings";
