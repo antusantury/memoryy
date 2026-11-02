@@ -284,7 +284,11 @@ for (const session of db.prepare("SELECT id, topics FROM sessions").all()) {
 async function askChatProvider(message, context, config = { provider: "copilot" }, interfaceLanguage = "en") {
   if (config.provider === "none") throw new Error("AI-разбор отключён в настройках");
   const fallbackLanguage = interfaceLanguage === "ru" ? "Russian" : "English";
-  const prompt = `You are the AI librarian inside Memoryy. Help the user work with their learning library. Do not change files or execute commands.
+  const prompt = `You are the AI librarian inside Memoryy. You may help the user work with their learning library, including modifying and deleting library data when explicitly asked. To perform an action, include one of these exact tags in your reply (they will be executed and removed from the shown answer):
+- [[DELETE_SESSION:<session id>]] — delete a conversation/material
+- [[RENAME_SESSION:<session id>:<new title>]] — rename
+- [[UPDATE_SUMMARY:<session id>:<new summary>]] — update summary
+Do not change files or execute shell commands.
 Respond in the same language as the user's latest message. If the language is ambiguous, use ${fallbackLanguage}. Do not let the language of these instructions determine your response language.
 ${context ? `Library context:\n${context}\n` : ""}
 User's latest message:
@@ -619,7 +623,8 @@ function route(req, res) {
           artifact: { id: artifact.id, title: artifact.title }
         });
       }
-      const answer = await askChatProvider(input.message.trim(), conversationContext, input.ai || { provider: "copilot" }, input.language);
+      let answer = await askChatProvider(input.message.trim(), conversationContext, input.ai || { provider: "copilot" }, input.language);
+answer = executeLibraryActions(answer);
       db.prepare("INSERT INTO chat_messages (id,chat_session_id,role,content,created_at) VALUES (?,?,?,?,?)")
         .run(randomUUID(), chatSessionId, "assistant", answer, now());
       const existing = db.prepare("SELECT title FROM chat_sessions WHERE id=?").get(chatSessionId);
@@ -694,6 +699,20 @@ function serveStatic(pathname, res) {
   const type = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" }[extname(file)] || "application/octet-stream";
   res.writeHead(200, { "content-type": type });
   createReadStream(file).pipe(res);
+}
+
+function executeLibraryActions(text) {
+  let output = String(text || "");
+  output = output.replace(/\[\[DELETE_SESSION:([^\]]+)\]\]/g, (_, id) => {
+    try { db.prepare("DELETE FROM sessions WHERE id=?").run(id.trim()); return " (deleted)"; } catch { return ""; }
+  });
+  output = output.replace(/\[\[RENAME_SESSION:([^:]+):([^\]]+)\]\]/g, (_, id, title) => {
+    try { db.prepare("UPDATE sessions SET title=? WHERE id=?").run(title.trim(), id.trim()); return " (renamed)"; } catch { return ""; }
+  });
+  output = output.replace(/\[\[UPDATE_SUMMARY:([^:]+):([^\]]+)\]\]/g, (_, id, summary) => {
+    try { db.prepare("UPDATE sessions SET summary=? WHERE id=?").run(summary.trim(), id.trim()); return " (updated)"; } catch { return ""; }
+  });
+  return output.trim();
 }
 
 const server = createServer((req, res) => {
